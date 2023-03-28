@@ -72,6 +72,7 @@ struct mgos_dns_sd_service_entry {
 #define F_SRV_SENT (1 << 1)
 #define F_TXT_SENT (1 << 2)
 
+static int m_debug_level = LL_DEBUG_VERBOSE;
 static struct mg_str s_host_name = MG_NULL_STR;
 SLIST_HEAD(s_instances, mgos_dns_sd_service_entry) s_instances;
 
@@ -108,7 +109,7 @@ static void add_srv_record(struct mg_dns_reply *reply, struct mg_str name,
   mg_dns_encode_name_s(rdata, host);
   mg_dns_encode_record(reply->io, &rr, name.p, name.len, rdata->buf,
                        rdata->len);
-  LOG(LL_DEBUG, ("    %d: %.*s SRV %d %.*s:%d", reply->msg->num_answers,
+  LOG(m_debug_level, ("    %d: %.*s SRV %d %.*s:%d", reply->msg->num_answers,
                  (int) name.len, name.p, ttl, (int) host.len, host.p, port));
   reply->msg->num_answers++;
 }
@@ -124,7 +125,7 @@ static void add_nsec_record(struct mg_dns_reply *reply, struct mg_str name,
   mbuf_append(rdata, "\x00\x01\x40", 3); /* Only A record is present */
   mg_dns_encode_record(reply->io, &rr, name.p, name.len, rdata->buf,
                        rdata->len);
-  LOG(LL_DEBUG, ("    %d: %.*s NSEC %d", reply->msg->num_answers,
+  LOG(m_debug_level, ("    %d: %.*s NSEC %d", reply->msg->num_answers,
                  (int) name.len, name.p, ttl));
   reply->msg->num_answers++;
 }
@@ -137,7 +138,7 @@ static void add_a_record(struct mg_dns_reply *reply, struct mg_str name,
       make_dns_rr(MG_DNS_A_RECORD,
                   (naive_client ? RCLASS_IN_NOFLUSH : RCLASS_IN_FLUSH), ttl);
   mg_dns_encode_record(reply->io, &rr, name.p, name.len, &addr, sizeof(addr));
-  LOG(LL_DEBUG, ("    %d: %.*s A %d %s", reply->msg->num_answers,
+  LOG(m_debug_level, ("    %d: %.*s A %d %s", reply->msg->num_answers,
                  (int) name.len, name.p, ttl, inet_ntoa(addr)));
   reply->msg->num_answers++;
   (void) rdata;
@@ -148,7 +149,7 @@ static void add_txt_record(struct mg_dns_reply *reply, struct mg_str name,
   struct mg_dns_resource_record rr =
       make_dns_rr(MG_DNS_TXT_RECORD, RCLASS_IN_FLUSH, ttl);
   mg_dns_encode_record(reply->io, &rr, name.p, name.len, txt.p, txt.len);
-  LOG(LL_DEBUG, ("    %d: %.*s TXT %d %.*s", reply->msg->num_answers,
+  LOG(m_debug_level, ("    %d: %.*s TXT %d %.*s", reply->msg->num_answers,
                  (int) name.len, name.p, ttl, (int) txt.len, txt.p));
   reply->msg->num_answers++;
   (void) rdata;
@@ -159,7 +160,7 @@ static void add_ptr_record(struct mg_dns_reply *reply, struct mg_str name,
   struct mg_dns_resource_record rr =
       make_dns_rr(MG_DNS_PTR_RECORD, RCLASS_IN_NOFLUSH, ttl);
   rdata->len = 0;
-  LOG(LL_DEBUG, ("    %d: %.*s PTR %d %.*s", reply->msg->num_answers,
+  LOG(m_debug_level, ("    %d: %.*s PTR %d %.*s", reply->msg->num_answers,
                  (int) name.len, name.p, ttl, (int) target.len, target.p));
   mg_dns_encode_name_s(rdata, target);
   mg_dns_encode_record(reply->io, &rr, name.p, name.len, rdata->buf,
@@ -263,7 +264,7 @@ static void handler(struct mg_connection *nc, int ev, void *ev_data,
       /* the reply goes either to the sender or to a multicast dest */
       struct mg_connection *reply_conn = nc;
       char *peer = inet_ntoa(nc->sa.sin.sin_addr);
-      LOG(LL_DEBUG, ("-- %d.%d DNS packet from %s (%d questions, %d answers)",
+      LOG(m_debug_level, ("-- %d.%d DNS packet from %s (%d questions, %d answers)",
                      mm->if_type, mm->if_instance, peer, msg->num_questions,
                      msg->num_answers));
       mbuf_init(&rdata, 0);
@@ -289,7 +290,7 @@ static void handler(struct mg_connection *nc, int ev, void *ev_data,
         struct mg_str name = mg_mk_str(name_buf);
         int is_unicast = (rr->rclass & MGOS_MDNS_QUERY_UNICAST) || naive_client;
 
-        LOG(LL_DEBUG, ("  Q type %d name %.*s (%s), unicast: %d", rr->rtype,
+        LOG(m_debug_level, ("  Q type %d name %.*s (%s), unicast: %d", rr->rtype,
                        (int) name.len, name.p, (is_unicast ? "QU" : "QM"),
                        (rr->rclass & MGOS_MDNS_QUERY_UNICAST) != 0));
         /*
@@ -347,7 +348,7 @@ static void handler(struct mg_connection *nc, int ev, void *ev_data,
       }
 
       if (msg->num_answers > 0) {
-        LOG(LL_DEBUG, ("  %c %d answers, %s, size %d",
+        LOG(m_debug_level, ("  %c %d answers, %s, size %d",
                        (reply.msg->num_answers > 0 ? '+' : '-'),
                        (int) reply.msg->num_answers,
                        (reply_conn == nc ? "unicast" : "multicast"),
@@ -382,7 +383,7 @@ static void dns_sd_advertise_if(enum mgos_net_if_type if_type, int if_instance,
   advertise(&reply, ip_info.ip.sin_addr.s_addr, false /* naive_client */,
             goodbye, &mbuf2);
   if (msg.num_answers > 0) {
-    LOG(LL_DEBUG, ("%d.%d sending adv as M, size %d, goodbye %d", if_type,
+    LOG(m_debug_level, ("%d.%d sending adv as M, size %d, goodbye %d", if_type,
                    if_instance, (int) reply.io->len, goodbye));
     mg_dns_insert_header(reply.io, reply.start, reply.msg);
     mgos_mdns_advertise(if_type, if_instance, &mbuf1);
@@ -539,6 +540,8 @@ bool mgos_dns_sd_init(void) {
   if (!mgos_dns_sd_set_host_name(NULL)) {
     return false;
   }
+
+  m_debug_level = mgos_sys_config_get_dns_sd_debug_level();
 
   LOG(LL_INFO, ("DNS-SD initialized, host %.*s, adv intvl %d",
                 (int) s_host_name.len, s_host_name.p, adv_intvl));
