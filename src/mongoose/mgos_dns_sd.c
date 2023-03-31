@@ -72,7 +72,7 @@ struct mgos_dns_sd_service_entry {
 #define F_SRV_SENT (1 << 1)
 #define F_TXT_SENT (1 << 2)
 
-static int m_debug_level = LL_DEBUG_VERBOSE;
+static int m_debug_level = LL_VERBOSE_DEBUG;
 static struct mg_str s_host_name = MG_NULL_STR;
 SLIST_HEAD(s_instances, mgos_dns_sd_service_entry) s_instances;
 
